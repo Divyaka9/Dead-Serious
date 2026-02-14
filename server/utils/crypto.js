@@ -1,51 +1,71 @@
 const crypto = require("crypto");
 
+const SERVER_KEY_BYTES = 32;
+
 function generateKey() {
-    return crypto.randomBytes(32); // AES-256 key
+  return crypto.randomBytes(SERVER_KEY_BYTES);
 }
 
 function encrypt(buffer, key) {
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv("aes-256-gcm", key, iv);
 
-    const iv = crypto.randomBytes(12);
+  const encrypted = Buffer.concat([cipher.update(buffer), cipher.final()]);
+  const authTag = cipher.getAuthTag();
 
-    const cipher = crypto.createCipheriv(
-        "aes-256-gcm",
-        key,
-        iv
-    );
-
-    const encrypted = Buffer.concat([
-        cipher.update(buffer),
-        cipher.final()
-    ]);
-
-    const authTag = cipher.getAuthTag();
-
-    return {
-        encrypted,
-        iv,
-        authTag
-    };
+  return {
+    encrypted,
+    iv,
+    authTag,
+  };
 }
 
 function decrypt(encrypted, key, iv, authTag) {
+  const decipher = crypto.createDecipheriv("aes-256-gcm", key, iv);
+  decipher.setAuthTag(authTag);
 
-    const decipher = crypto.createDecipheriv(
-        "aes-256-gcm",
-        key,
-        iv
-    );
+  return Buffer.concat([decipher.update(encrypted), decipher.final()]);
+}
 
-    decipher.setAuthTag(authTag);
+function getServerEncryptionKey() {
+  const rawKey = process.env.MASTER_SHARE_ENCRYPTION_KEY;
 
-    return Buffer.concat([
-        decipher.update(encrypted),
-        decipher.final()
-    ]);
+  if (!rawKey) {
+    throw new Error("MASTER_SHARE_ENCRYPTION_KEY is required for share encryption");
+  }
+
+  const key = Buffer.from(rawKey, "base64");
+  if (key.length !== SERVER_KEY_BYTES) {
+    throw new Error("MASTER_SHARE_ENCRYPTION_KEY must decode to 32 bytes (base64)");
+  }
+
+  return key;
+}
+
+function encryptText(plainText, key) {
+  const payload = Buffer.from(plainText, "utf8");
+  const { encrypted, iv, authTag } = encrypt(payload, key);
+
+  return {
+    cipherText: encrypted.toString("base64"),
+    iv: iv.toString("base64"),
+    authTag: authTag.toString("base64"),
+  };
+}
+
+function decryptText(payload, key) {
+  const encrypted = Buffer.from(payload.cipherText, "base64");
+  const iv = Buffer.from(payload.iv, "base64");
+  const authTag = Buffer.from(payload.authTag, "base64");
+
+  return decrypt(encrypted, key, iv, authTag).toString("utf8");
 }
 
 module.exports = {
-    generateKey,
-    encrypt,
-    decrypt
+  generateKey,
+  encrypt,
+  decrypt,
+  getServerEncryptionKey,
+  encryptText,
+  decryptText,
 };

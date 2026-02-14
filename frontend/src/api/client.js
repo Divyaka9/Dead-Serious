@@ -1,31 +1,92 @@
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000'
+
+const AUTH_STORAGE_KEY = 'deadlock-auth-session'
+
+function getStoredSession() {
+  try {
+    return JSON.parse(localStorage.getItem(AUTH_STORAGE_KEY) || 'null')
+  } catch {
+    return null
+  }
+}
+
+function persistSession(session) {
+  if (!session) {
+    localStorage.removeItem(AUTH_STORAGE_KEY)
+    return
+  }
+
+  localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(session))
+}
+
+function getToken() {
+  return getStoredSession()?.token || ''
+}
 
 async function request(path, options = {}) {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    headers: {
-      'Content-Type': 'application/json',
-      ...(options.headers || {}),
-    },
-    ...options,
-  })
-
-  if (!response.ok) {
-    const errorText = await response.text()
-    throw new Error(errorText || `Request failed: ${response.status}`)
+  const token = getToken()
+  let response
+  try {
+    response = await fetch(`${API_BASE_URL}${path}`, {
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(options.headers || {}),
+      },
+      ...options,
+    })
+  } catch {
+    throw new Error(`Cannot reach API at ${API_BASE_URL}. Is backend running?`)
   }
 
   const contentType = response.headers.get('content-type') || ''
-  if (contentType.includes('application/json')) {
-    return response.json()
+  const payload = contentType.includes('application/json')
+    ? await response.json()
+    : await response.text()
+
+  if (!response.ok) {
+    const message =
+      typeof payload === 'string'
+        ? payload
+        : payload?.error || `Request failed: ${response.status}`
+    throw new Error(message)
   }
 
-  return response.text()
+  return payload
 }
 
 export const apiClient = {
-  get: (path) => request(path),
-  post: (path, body) => request(path, { method: 'POST', body: JSON.stringify(body) }),
-  put: (path, body) => request(path, { method: 'PUT', body: JSON.stringify(body) }),
-  patch: (path, body) => request(path, { method: 'PATCH', body: JSON.stringify(body) }),
-  delete: (path) => request(path, { method: 'DELETE' }),
+  getSession: () => getStoredSession(),
+  clearSession: () => persistSession(null),
+
+  register: async (body) => {
+    const response = await request('/auth/register', { method: 'POST', body: JSON.stringify(body) })
+    const session = { token: response.token, user: response.user }
+    persistSession(session)
+    return response
+  },
+
+  login: async (body) => {
+    const response = await request('/auth/login', { method: 'POST', body: JSON.stringify(body) })
+    const session = { token: response.token, user: response.user }
+    persistSession(session)
+    return response
+  },
+
+  getMe: () => request('/auth/me'),
+
+  createVault: (body) => request('/vault/create', { method: 'POST', body: JSON.stringify(body) }),
+  storeShares: (vaultId, body) =>
+    request(`/vault/${vaultId}/shares`, { method: 'POST', body: JSON.stringify(body) }),
+  uploadEncryptedFile: (vaultId, body) =>
+    request(`/vault/${vaultId}/files`, { method: 'POST', body: JSON.stringify(body) }),
+  getDashboard: (vaultId) => request(`/vault/${vaultId}/dashboard`),
+  checkIn: (vaultId) => request(`/vault/${vaultId}/check-in`, { method: 'POST' }),
+  requestUnlock: (vaultId, body) =>
+    request(`/vault/${vaultId}/request-unlock`, { method: 'POST', body: JSON.stringify(body) }),
+  getApprovals: (vaultId) => request(`/vault/${vaultId}/approvals`),
+  approveUnlock: (vaultId, body) =>
+    request(`/vault/${vaultId}/approve`, { method: 'POST', body: JSON.stringify(body) }),
+  getNomineeShare: (vaultId, body) =>
+    request(`/vault/${vaultId}/nominee-share`, { method: 'POST', body: JSON.stringify(body) }),
 }

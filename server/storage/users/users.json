@@ -1,0 +1,26 @@
+[
+  {
+    "userId": "b9c034de-9ccc-4d30-9e5a-c2c681d4207f",
+    "email": "jane.doe@deadlock.dev",
+    "name": "Jane Doe",
+    "passwordHash": "$2b$10$oq/4a5BFbVD292ps5zteC.Icrwz74GQmzB4uxiAwxXOsNgBizbMSG",
+    "createdAt": "2026-02-14T21:11:37.468Z",
+    "updatedAt": "2026-02-14T21:11:37.468Z"
+  },
+  {
+    "userId": "83f8572f-938f-46e8-8cd0-df72dcb49f51",
+    "email": "alex.carter@deadlock.dev",
+    "name": "Alex Carter",
+    "passwordHash": "$2b$10$Nd2KKJgiBmLHMwwmyUETfeiI.Lb5Q7YVFHnAfCNEf68I.lEQjspqq",
+    "createdAt": "2026-02-14T21:11:37.536Z",
+    "updatedAt": "2026-02-14T21:11:37.536Z"
+  },
+  {
+    "userId": "50cfdadb-b790-4278-8818-9a3a12810090",
+    "email": "priya.shah@deadlock.dev",
+    "name": "Priya Shah",
+    "passwordHash": "$2b$10$shdr3Zn7ziGj0cgC2dnOAuVCUJ3yZsVKXmgGDF0OvesE655D9VikC",
+    "createdAt": "2026-02-14T21:11:37.598Z",
+    "updatedAt": "2026-02-14T21:11:37.598Z"
+  }
+]

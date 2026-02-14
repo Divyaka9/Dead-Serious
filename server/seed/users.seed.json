@@ -1,0 +1,17 @@
+[
+  {
+    "name": "Jane Doe",
+    "email": "jane.doe@deadlock.dev",
+    "password": "Deadlock@123"
+  },
+  {
+    "name": "Alex Carter",
+    "email": "alex.carter@deadlock.dev",
+    "password": "Deadlock@123"
+  },
+  {
+    "name": "Priya Shah",
+    "email": "priya.shah@deadlock.dev",
+    "password": "Deadlock@123"
+  }
+]
