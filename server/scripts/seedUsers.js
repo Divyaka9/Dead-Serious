@@ -1,13 +1,17 @@
 const fs = require('fs')
 const path = require('path')
 
-const { initPostgres } = require('../db/postgres')
+require('dotenv').config({ path: path.join(__dirname, '..', '..', '.env') })
+
 const { registerUser } = require('../services/authService')
 
 const SEED_PATH = path.join(__dirname, '..', 'seed', 'users.seed.json')
 
 async function seedUsers() {
-  await initPostgres()
+  if (process.env.USE_POSTGRES === 'true') {
+    const { initPostgres } = require('../db/postgres')
+    await initPostgres()
+  }
 
   if (!fs.existsSync(SEED_PATH)) {
     throw new Error(`Seed file not found: ${SEED_PATH}`)

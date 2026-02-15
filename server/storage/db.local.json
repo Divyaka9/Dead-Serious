@@ -1,0 +1,120 @@
+{
+  "users": [],
+  "vaults": [
+    {
+      "vault_id": "c972b5cc-a3cc-4182-8277-e91dd39ccdda",
+      "owner_id": "b9c034de-9ccc-4d30-9e5a-c2c681d4207f",
+      "metadata": {
+        "vaultId": "c972b5cc-a3cc-4182-8277-e91dd39ccdda",
+        "ownerId": "b9c034de-9ccc-4d30-9e5a-c2c681d4207f",
+        "vaultName": "sd",
+        "nominees": [
+          {
+            "id": "1",
+            "email": "asd.edu",
+            "status": "pending",
+            "approvedAt": null,
+            "notifiedAt": "2026-02-15T03:16:34.602Z",
+            "shareReleasedAt": null,
+            "shareSubmittedAt": null
+          },
+          {
+            "id": "2",
+            "email": "jkl.edu",
+            "status": "pending",
+            "approvedAt": null,
+            "notifiedAt": "2026-02-15T03:16:34.602Z",
+            "shareReleasedAt": null,
+            "shareSubmittedAt": null
+          },
+          {
+            "id": "3",
+            "email": "bnm.edu",
+            "status": "pending",
+            "approvedAt": null,
+            "notifiedAt": "2026-02-15T03:16:34.602Z",
+            "shareReleasedAt": null,
+            "shareSubmittedAt": null
+          }
+        ],
+        "threshold": 3,
+        "triggerTime": "2027-03-12T12:30",
+        "status": "nominees_notified",
+        "createdAt": "2026-02-15T03:16:06.743Z",
+        "updatedAt": "2026-02-15T03:16:34.602Z",
+        "checkInPolicy": {
+          "intervalDays": 14,
+          "gracePeriodDays": 30,
+          "maxMissedCheckIns": 2
+        },
+        "deadMan": {
+          "checkInIntervalDays": 14,
+          "missedCount": 0,
+          "lastCheckInAt": "2026-02-15T03:16:27.119Z",
+          "nextCheckInDueAt": "2026-03-01T03:16:27.119Z",
+          "graceStartedAt": null,
+          "graceEndsAt": null,
+          "nomineesNotifiedAt": "2026-02-15T03:16:34.602Z"
+        },
+        "checkIns": [
+          "2026-02-15T03:16:27.119Z"
+        ],
+        "lastCheckIn": "2026-02-15T03:16:27.119Z",
+        "unlockRequest": {
+          "requestedAt": "2026-02-15T03:16:34.602Z",
+          "reason": "",
+          "approvalsRequired": 3,
+          "approvedCount": 0,
+          "completedAt": null
+        },
+        "shareCheckpoint": {
+          "submittedByNominee": {},
+          "submittedCount": 0,
+          "completedAt": null
+        },
+        "files": [],
+        "shares": {
+          "threshold": 3,
+          "totalShares": 3,
+          "fragments": [
+            {
+              "shareId": "1",
+              "encryptedShare": {
+                "cipherText": "JHPuMMHJbDuctZ9eeb5qTF5rbWLGf7hsT8ggWfxZv8D0StEEQQfiqg7jJ3/tUQz5hxXS0xUIgT6d1JKc",
+                "iv": "IdIZO/ao7LeYF3P4",
+                "authTag": "KzTim/Od89DAC+OJdMIXKg=="
+              },
+              "storedAt": "2026-02-15T03:16:07.554Z"
+            },
+            {
+              "shareId": "2",
+              "encryptedShare": {
+                "cipherText": "0UF4nJrT490+SReYmOAeZa68LYADK2FKIKoJk1gn6Tvj4sG0BupacR9TAK6p0lMnHiRix2QN9iiknzRz",
+                "iv": "IoFWN5YYc9spRRyd",
+                "authTag": "iQAT6EZSZWZXfBjfU3jt7w=="
+              },
+              "storedAt": "2026-02-15T03:16:07.554Z"
+            },
+            {
+              "shareId": "3",
+              "encryptedShare": {
+                "cipherText": "hPzSy80QPHFuQCfoIbhMfSIm65PljRCLYmnQwPNolw2ykAdOP4hHKCH4dYVMIKUIkui9ry5HzMaDF7Em",
+                "iv": "phiH9ciH1L3IDCGt",
+                "authTag": "AksCK1Up+s6gdYZgcpXHUg=="
+              },
+              "storedAt": "2026-02-15T03:16:07.554Z"
+            }
+          ],
+          "updatedAt": "2026-02-15T03:16:07.554Z"
+        },
+        "storage": {
+          "provider": "s3",
+          "bucketName": "deadlock-user-b9c034de-9ccc-4d30-9e5a-c2c681d4207f",
+          "rootPrefix": "vaults/c972b5cc-a3cc-4182-8277-e91dd39ccdda"
+        }
+      },
+      "created_at": "2026-02-15T03:16:06.743Z",
+      "updated_at": "2026-02-15T03:16:34.603Z"
+    }
+  ]
+}

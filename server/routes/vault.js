@@ -2,6 +2,7 @@ const express = require('express');
 
 const authMiddleware = require('../middleware/auth');
 const vaultService = require('../services/vaultService');
+const { isS3Enabled, getBucketNameForUser } = require('../utils/s3');
 
 const router = express.Router();
 
@@ -88,6 +89,30 @@ router.get('/me', authMiddleware, async (req, res) => {
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: 'Failed to load vault' });
+  }
+});
+
+router.get('/me/storage-target', authMiddleware, async (req, res) => {
+  try {
+    const ownerId = req.user?.userId;
+    const s3Enabled = isS3Enabled();
+    const bucketName = getBucketNameForUser(ownerId);
+
+    return res.json({
+      success: true,
+      storage: {
+        ownerId,
+        provider: s3Enabled ? 's3' : 'local',
+        s3Enabled,
+        bucketName,
+        endpoint: process.env.S3_ENDPOINT_URL || null,
+        forcePathStyle: process.env.S3_FORCE_PATH_STYLE === 'true',
+        region: process.env.AWS_REGION || null,
+      },
+    });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Failed to compute storage target' });
   }
 });
 

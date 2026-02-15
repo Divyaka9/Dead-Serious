@@ -37,9 +37,29 @@ function loadS3Client() {
     throw new Error("AWS_REGION is required when S3 is enabled");
   }
 
+  const endpoint = process.env.S3_ENDPOINT_URL || undefined;
+  const forcePathStyle = process.env.S3_FORCE_PATH_STYLE === "true";
+  const accessKeyId = process.env.AWS_ACCESS_KEY_ID;
+  const secretAccessKey = process.env.AWS_SECRET_ACCESS_KEY;
+  const sessionToken = process.env.AWS_SESSION_TOKEN;
+
+  const clientConfig = {
+    region,
+    ...(endpoint ? { endpoint } : {}),
+    ...(forcePathStyle ? { forcePathStyle: true } : {}),
+  };
+
+  if (accessKeyId && secretAccessKey) {
+    clientConfig.credentials = {
+      accessKeyId,
+      secretAccessKey,
+      ...(sessionToken ? { sessionToken } : {}),
+    };
+  }
+
   const { S3Client } = s3Module;
   return {
-    client: new S3Client({ region }),
+    client: new S3Client(clientConfig),
     commands: s3Module,
     region,
   };

@@ -1,11 +1,11 @@
-require("dotenv").config();
+const path = require("path");
+require("dotenv").config({ path: path.join(__dirname, "..", ".env"), override: true });
 
 const express = require("express");
 const cors = require("cors");
 
 const authRoutes = require("./routes/auth");
 const vaultRoutes = require("./routes/vault");
-const { initPostgres } = require("./db/postgres");
 const { evaluateDeadManSwitches } = require("./services/vaultService");
 
 const app = express();
@@ -24,7 +24,10 @@ const PORT = Number(process.env.PORT || 3000);
 const MONITOR_INTERVAL_MS = Number(process.env.DEADMAN_MONITOR_INTERVAL_MS || 60_000);
 
 async function startServer() {
-  await initPostgres();
+  if (process.env.USE_POSTGRES === "true") {
+    const { initPostgres } = require("./db/postgres");
+    await initPostgres();
+  }
 
   setInterval(async () => {
     try {
