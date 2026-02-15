@@ -712,12 +712,7 @@ async function startNomineeLogin(vaultId, nomineeEmail) {
   } catch (error) {
     otpDelivery = 'failed';
     otpDeliveryError = error?.message || 'Unknown mail transport error';
-
-    if (process.env.NODE_ENV === 'production') {
-      throw new Error(`Failed to send nominee verification email: ${otpDeliveryError}`);
-    }
-
-    console.error(`[nominee-otp] delivery failed nominee=${normalizedNominee} vault=${vault.vaultId}: ${otpDeliveryError}`);
+    throw new Error(`Failed to send nominee verification email: ${otpDeliveryError}`);
   }
 
   return {
@@ -725,7 +720,6 @@ async function startNomineeLogin(vaultId, nomineeEmail) {
     expiresIn: '10m',
     otpDelivery,
     ...(otpDeliveryError ? { otpDeliveryError } : {}),
-    ...(process.env.NODE_ENV === 'production' ? {} : { devCode: code }),
   };
 }
 
@@ -892,6 +886,5 @@ module.exports = {
   getNomineeStatus,
   listFilesForNominee,
   downloadFileForNominee,
-  deleteFileForOwner,
   evaluateDeadManSwitches,
 };

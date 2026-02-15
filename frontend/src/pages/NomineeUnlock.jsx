@@ -49,11 +49,7 @@ function NomineeUnlock({ onBackToLogin = null }) {
         nomineeEmail: nomineeEmail.trim().toLowerCase(),
       })
       setChallengeToken(response.challengeToken)
-      setSuccess(
-        response.devCode
-          ? `Verification code sent. Dev code: ${response.devCode}`
-          : 'Verification code sent to nominee email.'
-      )
+      setSuccess('Verification code sent to nominee email.')
     } catch (startError) {
       setError(startError.message)
     } finally {
