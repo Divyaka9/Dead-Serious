@@ -191,4 +191,8 @@ export const apiClient = {
   },
 
   evaluateDeadman: () => request('/vault/evaluate-deadman', { method: 'POST' }),
+
+  deleteMyEncryptedFile: (fileId) =>
+  request(`/vault/me/files/${fileId}`, { method: 'DELETE' }),
+
 }

@@ -140,6 +140,22 @@ async function notifyNomineesForVault(vault, nowIso) {
   vault.nominees = updatedNominees;
 }
 
+async function deleteFileForOwner(ownerId, fileId) {
+  const vault = await requireVaultByOwner(ownerId);
+  const fileRecord = requireFileRecord(vault, fileId);
+
+  await deleteObject({
+    bucketName: vault.storage.bucketName,
+    key: fileRecord.storageKey,
+  });
+
+  vault.files = (vault.files || []).filter((file) => file.id !== fileId);
+  vault.updatedAt = new Date().toISOString();
+  await persistVault(vault);
+
+  return { deleted: true, fileId };
+}
+
 function buildVaultMetadata({
   vaultId,
   ownerId,
@@ -876,5 +892,6 @@ module.exports = {
   getNomineeStatus,
   listFilesForNominee,
   downloadFileForNominee,
+  deleteFileForOwner,
   evaluateDeadManSwitches,
 };

@@ -1,11 +1,9 @@
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import { apiClient } from '../api/client'
+import { encryptPayload } from '../crypto/encrypt'
 
 function daysUntil(dateValue) {
-  if (!dateValue) {
-    return null
-  }
-
+  if (!dateValue) return null
   const now = Date.now()
   const target = new Date(dateValue).getTime()
   const diff = Math.max(0, target - now)
@@ -14,96 +12,111 @@ function daysUntil(dateValue) {
 
 function getCheckInProgress(vault) {
   const last = vault?.lastCheckIn ? new Date(vault.lastCheckIn).getTime() : Date.now()
-  const next = vault?.deadMan?.nextCheckInDueAt ? new Date(vault.deadMan.nextCheckInDueAt).getTime() : last
+  const next = vault?.deadMan?.nextCheckInDueAt
+    ? new Date(vault.deadMan.nextCheckInDueAt).getTime()
+    : last
 
   const span = Math.max(next - last, 1)
   const elapsed = Math.min(Math.max(Date.now() - last, 0), span)
   return Math.round((elapsed / span) * 100)
 }
 
-function getContentBucket(file = {}) {
-  const contentType = String(file.contentType || '').toLowerCase()
-  const fileName = String(file.fileName || '').toLowerCase()
+function textToBase64(value) {
+  return btoa(unescape(encodeURIComponent(value)))
+}
 
-  if (contentType.startsWith('image/')) {
-    return 'Family Photos'
-  }
-
-  if (contentType.startsWith('video/')) {
-    return 'Final Message'
-  }
-
-  if (
-    fileName.includes('wallet') ||
-    fileName.includes('seed') ||
-    fileName.includes('mnemonic') ||
-    fileName.endsWith('.key')
-  ) {
-    return 'Crypto Wallet Keys'
-  }
-
-  if (
-    contentType.includes('pdf') ||
-    contentType.includes('msword') ||
-    contentType.includes('officedocument') ||
-    fileName.endsWith('.pdf') ||
-    fileName.endsWith('.doc') ||
-    fileName.endsWith('.docx') ||
-    fileName.endsWith('.txt')
-  ) {
-    return 'Legal Documents'
-  }
-
-  if (
-    fileName.includes('password') ||
-    fileName.includes('passcode') ||
-    fileName.includes('credential') ||
-    fileName.endsWith('.csv')
-  ) {
-    return 'Master Passwords'
-  }
-
-  return 'Master Passwords'
+function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => {
+      const result = String(reader.result || '')
+      const base64 = result.includes(',') ? result.split(',')[1] : result
+      resolve(base64)
+    }
+    reader.onerror = () => reject(new Error('Failed to read selected file'))
+    reader.readAsDataURL(file)
+  })
 }
 
 function Dashboard({ vault, onVaultUpdated }) {
   const [reason, setReason] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [selectedFiles, setSelectedFiles] = useState([])
+  const [showUploadedFiles, setShowUploadedFiles] = useState(false)
+  const [deletingFileId, setDeletingFileId] = useState(null)
 
   const handleRefresh = async () => {
     setLoading(true)
     setError('')
-
     try {
       await onVaultUpdated?.()
-    } catch (refreshError) {
-      setError(refreshError.message)
+    } catch (err) {
+      setError(err.message)
     } finally {
       setLoading(false)
     }
   }
 
   const handleCheckIn = async () => {
-    if (!vault) {
-      return
-    }
-
+    if (!vault) return
     setLoading(true)
     setError('')
-
     try {
       await apiClient.checkInMyVault(vault.vaultId)
       await onVaultUpdated?.()
-    } catch (checkInError) {
-      setError(checkInError.message)
+    } catch (err) {
+      setError(err.message)
     } finally {
       setLoading(false)
     }
   }
 
   const handleRequestUnlock = async () => {
-    if (!vault) {
+    if (!vault) return
+    setLoading(true)
+    setError('')
+    try {
+      await apiClient.requestUnlockMyVault({ reason }, vault.vaultId)
+      await onVaultUpdated?.()
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleFilesSelected = (event) => {
+    const nextFiles = Array.from(event.target.files || [])
+    if (!nextFiles.length) return
+
+    setSelectedFiles((current) => {
+      const seen = new Set(current.map((f) => `${f.name}:${f.size}:${f.lastModified}`))
+      const merged = [...current]
+
+      nextFiles.forEach((file) => {
+        const key = `${file.name}:${file.size}:${file.lastModified}`
+        if (!seen.has(key)) {
+          seen.add(key)
+          merged.push(file)
+        }
+      })
+
+      return merged
+    })
+  }
+
+  const handleUploadSelected = async () => {
+    if (!vault) return
+
+    const masterKey = localStorage.getItem(`deadlock-master-key-${vault.vaultId}`)
+    if (!masterKey) {
+      setError('Missing master key for this vault.')
+      return
+    }
+
+    if (!selectedFiles.length) {
+      setError('Choose at least one file.')
       return
     }
 
@@ -111,43 +124,74 @@ function Dashboard({ vault, onVaultUpdated }) {
     setError('')
 
     try {
-      await apiClient.requestUnlockMyVault({ reason }, vault.vaultId)
+      for (const file of selectedFiles) {
+        const base64File = await fileToBase64(file)
+        const encryptedPayload = await encryptPayload(base64File, masterKey)
+
+        const packedCipherText = textToBase64(
+          JSON.stringify({
+            type: 'encrypted-file',
+            fileName: file.name,
+            originalContentType: file.type || 'application/octet-stream',
+            encryptedPayload,
+          })
+        )
+
+        await apiClient.uploadMyEncryptedFile(
+          {
+            fileName: file.name,
+            contentType: 'application/json',
+            cipherTextBase64: packedCipherText,
+          },
+          vault.vaultId
+        )
+      }
+
+      setSelectedFiles([])
       await onVaultUpdated?.()
-    } catch (requestError) {
-      setError(requestError.message)
+    } catch (err) {
+      setError(err.message)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleDeleteFile = async (file) => {
+    const fileId = file?.id
+
+    if (!fileId) {
+      setError('Missing fileId for this file')
+      return
+    }
+
+    const ok = window.confirm(`Delete "${file.fileName || 'this file'}"? This cannot be undone.`)
+    if (!ok) return
+
+    setDeletingFileId(fileId)
+    setError('')
+
+    try {
+      await apiClient.deleteMyEncryptedFile(fileId)
+      await onVaultUpdated?.()
+    } catch (e) {
+      setError(e.message || 'Delete failed')
+    } finally {
+      setDeletingFileId(null)
     }
   }
 
   const nominees = vault?.approvals?.nominees || []
   const pendingDays = daysUntil(vault?.deadMan?.nextCheckInDueAt)
   const checkInProgress = getCheckInProgress(vault)
-  const notificationStarted = vault?.status === 'nominees_notified' || vault?.status === 'unlocked'
-
-  const contentRows = useMemo(() => {
-    const labels = ['Master Passwords', 'Legal Documents', 'Family Photos', 'Final Message', 'Crypto Wallet Keys']
-    const counts = labels.reduce((acc, label) => ({ ...acc, [label]: 0 }), {})
-
-    for (const file of vault?.files || []) {
-      const bucket = getContentBucket(file)
-      counts[bucket] += 1
-    }
-
-    return labels.map((label) => ({
-      label,
-      items: counts[label] || 0,
-    }))
-  }, [vault?.files])
-
-  const totalItems = contentRows.reduce((acc, row) => acc + row.items, 0)
+  const notificationStarted =
+    vault?.status === 'nominees_notified' || vault?.status === 'unlocked'
 
   if (!vault) {
     return (
       <section className="page dashboard-page">
         <article className="panel">
           <h3>No Vault Yet</h3>
-          <p>Create your vault first. Each account supports one vault that you can edit later.</p>
+          <p>Create your vault first.</p>
         </article>
       </section>
     )
@@ -155,28 +199,40 @@ function Dashboard({ vault, onVaultUpdated }) {
 
   return (
     <section className="page dashboard-page">
+      {/* Vault Header */}
       <div className="panel control-row deadlock-toolbar">
         <div>
           <p className="faint">Vault ID</p>
           <code>{vault.vaultId}</code>
         </div>
-        <div className="action-group">
-          <button type="button" className="btn btn-ghost" onClick={handleRefresh} disabled={loading}>
-            Refresh
-          </button>
-        </div>
+        <button
+          type="button"
+          className="btn btn-ghost"
+          onClick={handleRefresh}
+          disabled={loading}
+        >
+          Refresh
+        </button>
       </div>
 
+      {/* Dead Man Switch */}
       <article className="panel dm-panel">
         <div className="panel-head">
           <h3>Dead Man&apos;s Switch</h3>
-          <span className="faint">Every {vault?.checkInPolicy?.intervalDays || 14} days</span>
+          <span className="faint">
+            Every {vault?.checkInPolicy?.intervalDays || 14} days
+          </span>
         </div>
-        <p className="warning-line">
-          {pendingDays !== null ? `${pendingDays} days until next check-in deadline` : 'No check-in deadline yet'}
+        <p>
+          {pendingDays !== null
+            ? `${pendingDays} days until next check-in`
+            : 'No deadline set'}
         </p>
         <div className="progress-track">
-          <span className="progress-bar" style={{ width: `${checkInProgress}%` }} />
+          <span
+            className="progress-bar"
+            style={{ width: `${checkInProgress}%` }}
+          />
         </div>
         <button
           type="button"
@@ -184,92 +240,101 @@ function Dashboard({ vault, onVaultUpdated }) {
           onClick={handleCheckIn}
           disabled={loading || notificationStarted}
         >
-          I&apos;M ALIVE - CHECK IN
+          I'M ALIVE - CHECK IN
         </button>
-        {notificationStarted && (
-          <p className="message error">Check-in is disabled after nominee notification has started.</p>
-        )}
       </article>
 
-      <article className="panel vault-content-panel">
+      {/* Vault Contents */}
+      <article className="panel">
         <div className="panel-head">
           <h3>Vault Contents</h3>
-          <span className="pill">{vault.files?.length || 0} file(s)</span>
+          <span className="pill">
+            {vault.files?.length || 0} file(s)
+          </span>
         </div>
-        <ul className="rows-list">
-          {contentRows.map((row) => (
-            <li key={row.label}>
-              <span>{row.label}</span>
-              <span className="faint">{row.items} items</span>
-            </li>
-          ))}
-        </ul>
-        <div className="rows-foot">
-          <span>Total encrypted items</span>
-          <strong>{totalItems}</strong>
-        </div>
+        <p>
+          <strong>{vault.files?.length || 0}</strong> encrypted file(s) stored.
+        </p>
       </article>
 
+      {/* Key Holders */}
       <article className="panel keyholders-panel">
         <div className="panel-head">
           <h3>Key Holders</h3>
-          <span className="pill status-live">{nominees.length}/3 Assigned</span>
+          <span className="pill status-live">
+            {nominees.length}/3 Assigned
+          </span>
         </div>
         <ul className="rows-list">
-          {(nominees.length ? nominees : [{ email: 'Nominee A' }, { email: 'Nominee B' }, { email: 'Nominee C' }]).map(
-            (nominee, index) => (
-              <li key={nominee.id || nominee.email}>
-                <span>
-                  {nominee.email || `Nominee ${String.fromCharCode(65 + index)}`}
-                  <small className="faint">Fragment assigned</small>
-                </span>
-                <span className="faint">{nominee.status || 'pending'}</span>
-              </li>
-            )
-          )}
+          {nominees.map((nominee) => (
+            <li key={nominee.email}>
+              <span>{nominee.email}</span>
+              <span className="faint">{nominee.status || 'pending'}</span>
+            </li>
+          ))}
         </ul>
-        <p className="faint">Nominees are notified only after dead-man switch triggers or manual unlock request.</p>
       </article>
 
-      <article className="panel security-panel">
-        <div className="panel-head">
-          <h3>Security Status</h3>
+      {/* Upload Section */}
+      <article className="panel full-width-panel">
+        <div className="panel-head" style={{ display: 'flex', justifyContent: 'space-between' }}>
+          <h3>Upload Encrypted Files</h3>
+          <button
+            type="button"
+            className="btn btn-ghost"
+            onClick={() => setShowUploadedFiles(!showUploadedFiles)}
+          >
+            {showUploadedFiles ? 'Hide uploaded files' : 'Show uploaded files'}
+          </button>
         </div>
-        <ul className="rows-list compact">
-          <li>
-            <span>Encryption</span>
-            <strong>AES-256-GCM</strong>
-          </li>
-          <li>
-            <span>Key Split</span>
-            <strong>Shamir 3-of-3</strong>
-          </li>
-          <li>
-            <span>Storage</span>
-            <strong>S3 + Postgres Metadata</strong>
-          </li>
-          <li>
-            <span>Vault Status</span>
-            <strong>{vault?.status || 'Sealed'}</strong>
-          </li>
-        </ul>
-      </article>
 
-      <article className="panel unlock-panel">
         <label className="field">
-          <span>Unlock reason</span>
-          <input
-            value={reason}
-            onChange={(event) => setReason(event.target.value)}
-            placeholder="Reason for emergency unlock request"
-          />
+          <span>Choose files</span>
+          <input type="file" multiple onChange={handleFilesSelected} />
         </label>
-        <button type="button" className="btn" onClick={handleRequestUnlock} disabled={loading || notificationStarted}>
-          {notificationStarted ? 'Nominees Already Notified' : 'Trigger Nominee Notification'}
+
+        <button
+          type="button"
+          className="btn btn-primary"
+          onClick={handleUploadSelected}
+          disabled={loading || selectedFiles.length === 0}
+        >
+          {loading ? 'Uploading…' : 'Upload'}
         </button>
+
+        {/* Uploaded Files List */}
+        {showUploadedFiles && (
+          <ul className="rows-list" style={{ marginTop: 16 }}>
+            {vault.files?.map((file) => (
+              <li
+                key={file.fileId}
+                style={{ display: 'flex', justifyContent: 'space-between' }}
+              >
+                <div>
+                  <strong>{file.fileName}</strong>
+                  {file.createdAt && (
+                    <div className="faint">
+                      {new Date(file.createdAt).toLocaleString()}
+                    </div>
+                  )}
+                </div>
+
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  onClick={() => handleDeleteFile(file)}
+                  disabled={deletingFileId === file.fileId}
+                >
+                  {deletingFileId === file.fileId ? 'Deleting…' : 'Delete'}
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
       </article>
 
-      {loading && <p className="message">Loading...</p>}
+      
+
       {error && <p className="message error">{error}</p>}
     </section>
   )
