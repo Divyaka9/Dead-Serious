@@ -9,11 +9,11 @@ import './App.css'
 const TABS = {
   dashboard: 'dashboard',
   createVault: 'createVault',
-  nomineeUnlock: 'nomineeUnlock',
 }
 
 function App() {
   const [activeTab, setActiveTab] = useState(TABS.dashboard)
+  const [authView, setAuthView] = useState('owner')
   const [session, setSession] = useState(() => apiClient.getSession())
   const [vault, setVault] = useState(null)
   const [vaultLoading, setVaultLoading] = useState(false)
@@ -63,13 +63,24 @@ function App() {
       <main className="app-shell">
         <header className="app-header card hero-header">
           <p className="app-kicker">Secure Legacy Vault</p>
-          <h1>DEADLOCK</h1>
+          <h1>DEAD SERIOUS</h1>
           <p className="app-mono">YOUR DIGITAL LEGACY, SEALED UNTIL IT MATTERS</p>
           <p className="app-subtitle">
             A cryptographic vault that protects your most sensitive files, passwords, and memories.
           </p>
         </header>
-        <Login onAuthenticated={setSession} />
+        {authView === 'owner' ? (
+          <>
+            <Login onAuthenticated={setSession} />
+            <section className="page card auth-card">
+              <button type="button" className="btn btn-ghost" onClick={() => setAuthView('nominee')}>
+                Nominee access via OTP
+              </button>
+            </section>
+          </>
+        ) : (
+          <NomineeUnlock onBackToLogin={() => setAuthView('owner')} />
+        )}
       </main>
     )
   }
@@ -78,7 +89,7 @@ function App() {
     <main className="app-shell">
       <header className="app-topbar">
         <div className="brand">
-          <p>DEADLOCK</p>
+          <p>DEAD SERIOUS</p>
         </div>
         <div className="user-row">
           <span className="pill status-live">{vault ? 'Vault Ready' : 'No Vault Yet'}</span>
@@ -104,13 +115,6 @@ function App() {
         >
           {vault ? 'Edit Vault' : 'Create Vault'}
         </button>
-        <button
-          type="button"
-          className={activeTab === TABS.nomineeUnlock ? 'tab-button is-active' : 'tab-button'}
-          onClick={() => setActiveTab(TABS.nomineeUnlock)}
-        >
-          Nominee Unlock
-        </button>
       </nav>
 
       <section className="active-vault card">
@@ -128,7 +132,6 @@ function App() {
       {activeTab === TABS.createVault && (
         <CreateVault currentUser={session.user} existingVault={vault} onVaultUpdated={loadVault} />
       )}
-      {activeTab === TABS.nomineeUnlock && <NomineeUnlock />}
     </main>
   )
 }

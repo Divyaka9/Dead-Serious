@@ -1,5 +1,6 @@
 const express = require("express");
 const { registerUser, loginUser } = require("../services/authService");
+const vaultService = require("../services/vaultService");
 const authMiddleware = require("../middleware/auth");
 
 const router = express.Router();
@@ -46,6 +47,52 @@ router.post("/login", async (req, res) => {
 
 router.get("/me", authMiddleware, (req, res) => {
   return res.json({ success: true, user: req.user });
+});
+
+router.post("/nominee/start", async (req, res) => {
+  try {
+    const vaultId = String(req.body.vaultId || "").trim();
+    const nomineeEmail = String(req.body.nomineeEmail || "").trim().toLowerCase();
+
+    if (!vaultId || !nomineeEmail) {
+      return res.status(400).json({ error: "vaultId and nomineeEmail are required" });
+    }
+
+    const result = await vaultService.startNomineeLogin(vaultId, nomineeEmail);
+    return res.json({ success: true, ...result });
+  } catch (error) {
+    if (
+      error.message.includes("Nominee") ||
+      error.message.includes("Vault not found") ||
+      error.message.includes("unavailable")
+    ) {
+      return res.status(400).json({ error: error.message });
+    }
+
+    console.error(error);
+    return res.status(500).json({ error: "Failed to start nominee login" });
+  }
+});
+
+router.post("/nominee/verify", async (req, res) => {
+  try {
+    const challengeToken = String(req.body.challengeToken || "").trim();
+    const code = String(req.body.code || "").trim();
+    const result = await vaultService.verifyNomineeLogin(challengeToken, code);
+    return res.json({ success: true, ...result });
+  } catch (error) {
+    if (
+      error.message.includes("required") ||
+      error.message.includes("Invalid") ||
+      error.message.includes("Nominee") ||
+      error.message.includes("unavailable")
+    ) {
+      return res.status(400).json({ error: error.message });
+    }
+
+    console.error(error);
+    return res.status(500).json({ error: "Failed to verify nominee login" });
+  }
 });
 
 module.exports = router;

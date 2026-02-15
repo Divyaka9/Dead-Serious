@@ -33,7 +33,7 @@ function Login({ onAuthenticated }) {
     <section className="page card auth-card">
       <div className="page-header">
         <h2>{isLogin ? 'Login' : 'Create Account'}</h2>
-        <p>Sign in to access your encrypted DEADLOCK vault workspace.</p>
+        <p>Sign in to access your encrypted DEAD SERIOUS vault workspace.</p>
       </div>
 
       <form className="vault-form" onSubmit={handleSubmit}>

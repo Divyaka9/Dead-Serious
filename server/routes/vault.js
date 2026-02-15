@@ -1,6 +1,7 @@
 const express = require('express');
 
 const authMiddleware = require('../middleware/auth');
+const nomineeAuth = require('../middleware/nomineeAuth');
 const vaultService = require('../services/vaultService');
 const { isS3Enabled, getBucketNameForUser } = require('../utils/s3');
 
@@ -42,7 +43,7 @@ async function handleVaultUpsert(req, res) {
 
     const thresholdValue = Number(threshold);
     if (thresholdValue !== 3) {
-      return res.status(400).json({ error: 'DEADLOCK requires 3-of-3 threshold' });
+      return res.status(400).json({ error: 'DEAD SERIOUS requires 3-of-3 threshold' });
     }
 
     const interval = parsePositiveInt(checkInIntervalDays, 14);
@@ -133,6 +134,9 @@ router.post('/me/check-in', authMiddleware, async (req, res) => {
     if (err.message === 'Vault not found') {
       return res.status(404).json({ error: err.message });
     }
+    if (err.message.includes('Check-in is disabled')) {
+      return res.status(400).json({ error: err.message });
+    }
     console.error(err);
     return res.status(500).json({ error: 'Check-in failed' });
   }
@@ -166,7 +170,12 @@ router.post('/me/shares', authMiddleware, async (req, res) => {
       return res.status(404).json({ error: err.message });
     }
 
-    if (err.message.includes('shares') || err.message.includes('DEADLOCK') || err.message.includes('MASTER_SHARE')) {
+    if (
+      err.message.includes('shares') ||
+      err.message.includes('DEADLOCK') ||
+      err.message.includes('DEAD SERIOUS') ||
+      err.message.includes('MASTER_SHARE')
+    ) {
       return res.status(400).json({ error: err.message });
     }
 
@@ -258,6 +267,97 @@ router.delete('/me/files/:fileId', authMiddleware, async (req, res) => {
     }
     console.error(err);
     return res.status(500).json({ error: 'Failed to delete file' });
+  }
+});
+
+router.get('/nominee/status', nomineeAuth, async (req, res) => {
+  try {
+    const status = await vaultService.getNomineeStatus(req.nominee.vaultId);
+    return res.json({ success: true, status });
+  } catch (err) {
+    if (err.message === 'Vault not found') {
+      return res.status(404).json({ error: err.message });
+    }
+    console.error(err);
+    return res.status(500).json({ error: 'Failed to load nominee status' });
+  }
+});
+
+router.post('/nominee/submit-share', nomineeAuth, async (req, res) => {
+  try {
+    const share = String(req.body.share || '').trim();
+    if (!share) {
+      return res.status(400).json({ error: 'share is required' });
+    }
+
+    const result = await vaultService.submitNomineeShare(
+      req.nominee.vaultId,
+      req.nominee.nomineeEmail,
+      share
+    );
+    return res.json({ success: true, result });
+  } catch (err) {
+    if (err.message === 'Vault not found') {
+      return res.status(404).json({ error: err.message });
+    }
+    if (err.message.includes('Nominee') || err.message.includes('share') || err.message.includes('Invalid')) {
+      return res.status(400).json({ error: err.message });
+    }
+    console.error(err);
+    return res.status(500).json({ error: 'Failed to submit nominee share' });
+  }
+});
+
+router.get('/nominee/files', nomineeAuth, async (req, res) => {
+  try {
+    const share = String(req.query.share || '').trim();
+    if (!share) {
+      return res.status(400).json({ error: 'share is required' });
+    }
+
+    const result = await vaultService.listFilesForNominee(
+      req.nominee.vaultId,
+      req.nominee.nomineeEmail,
+      share
+    );
+    return res.json({ success: true, ...result });
+  } catch (err) {
+    if (err.message === 'Vault not found') {
+      return res.status(404).json({ error: err.message });
+    }
+    if (err.message.includes('Nominee') || err.message.includes('share') || err.message.includes('Invalid')) {
+      return res.status(400).json({ error: err.message });
+    }
+    console.error(err);
+    return res.status(500).json({ error: 'Failed to list nominee files' });
+  }
+});
+
+router.get('/nominee/files/:fileId/download', nomineeAuth, async (req, res) => {
+  try {
+    const share = String(req.query.share || '').trim();
+    if (!share) {
+      return res.status(400).json({ error: 'share is required' });
+    }
+
+    const result = await vaultService.downloadFileForNominee(
+      req.nominee.vaultId,
+      req.params.fileId,
+      req.nominee.nomineeEmail,
+      share
+    );
+    res.setHeader('Content-Type', result.contentType || 'application/octet-stream');
+    res.setHeader('Content-Disposition', `attachment; filename=\"${result.fileName}\"`);
+    return res.send(result.body);
+  } catch (err) {
+    if (err.message === 'Vault not found' || err.message === 'File not found') {
+      return res.status(404).json({ error: err.message });
+    }
+    if (err.message.includes('Nominee') || err.message.includes('share') || err.message.includes('Invalid')) {
+      return res.status(400).json({ error: err.message });
+    }
+    console.error(err);
+    return res.status(500).json({ error: 'Failed to download nominee file' });
   }
 });
 

@@ -40,7 +40,7 @@ function VaultForm({ onSubmit, isSubmitting = false, ownerLabel = '', initialVal
     }
 
     if (parsedNominees.length !== 3) {
-      setError('Exactly 3 nominees are required for DEADLOCK.')
+      setError('Exactly 3 nominees are required for DEAD SERIOUS.')
       return
     }
 

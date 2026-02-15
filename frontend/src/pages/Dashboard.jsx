@@ -21,6 +21,51 @@ function getCheckInProgress(vault) {
   return Math.round((elapsed / span) * 100)
 }
 
+function getContentBucket(file = {}) {
+  const contentType = String(file.contentType || '').toLowerCase()
+  const fileName = String(file.fileName || '').toLowerCase()
+
+  if (contentType.startsWith('image/')) {
+    return 'Family Photos'
+  }
+
+  if (contentType.startsWith('video/')) {
+    return 'Final Message'
+  }
+
+  if (
+    fileName.includes('wallet') ||
+    fileName.includes('seed') ||
+    fileName.includes('mnemonic') ||
+    fileName.endsWith('.key')
+  ) {
+    return 'Crypto Wallet Keys'
+  }
+
+  if (
+    contentType.includes('pdf') ||
+    contentType.includes('msword') ||
+    contentType.includes('officedocument') ||
+    fileName.endsWith('.pdf') ||
+    fileName.endsWith('.doc') ||
+    fileName.endsWith('.docx') ||
+    fileName.endsWith('.txt')
+  ) {
+    return 'Legal Documents'
+  }
+
+  if (
+    fileName.includes('password') ||
+    fileName.includes('passcode') ||
+    fileName.includes('credential') ||
+    fileName.endsWith('.csv')
+  ) {
+    return 'Master Passwords'
+  }
+
+  return 'Master Passwords'
+}
+
 function Dashboard({ vault, onVaultUpdated }) {
   const [reason, setReason] = useState('')
   const [loading, setLoading] = useState(false)
@@ -78,14 +123,20 @@ function Dashboard({ vault, onVaultUpdated }) {
   const nominees = vault?.approvals?.nominees || []
   const pendingDays = daysUntil(vault?.deadMan?.nextCheckInDueAt)
   const checkInProgress = getCheckInProgress(vault)
+  const notificationStarted = vault?.status === 'nominees_notified' || vault?.status === 'unlocked'
 
   const contentRows = useMemo(() => {
-    const fallbackCounts = [12, 5, 34, 1, 3]
     const labels = ['Master Passwords', 'Legal Documents', 'Family Photos', 'Final Message', 'Crypto Wallet Keys']
+    const counts = labels.reduce((acc, label) => ({ ...acc, [label]: 0 }), {})
 
-    return labels.map((label, index) => ({
+    for (const file of vault?.files || []) {
+      const bucket = getContentBucket(file)
+      counts[bucket] += 1
+    }
+
+    return labels.map((label) => ({
       label,
-      items: vault?.files?.length ? Math.max(1, Math.floor(vault.files.length / (index + 1))) : fallbackCounts[index],
+      items: counts[label] || 0,
     }))
   }, [vault?.files])
 
@@ -127,9 +178,17 @@ function Dashboard({ vault, onVaultUpdated }) {
         <div className="progress-track">
           <span className="progress-bar" style={{ width: `${checkInProgress}%` }} />
         </div>
-        <button type="button" className="btn btn-primary" onClick={handleCheckIn} disabled={loading}>
+        <button
+          type="button"
+          className="btn btn-primary"
+          onClick={handleCheckIn}
+          disabled={loading || notificationStarted}
+        >
           I&apos;M ALIVE - CHECK IN
         </button>
+        {notificationStarted && (
+          <p className="message error">Check-in is disabled after nominee notification has started.</p>
+        )}
       </article>
 
       <article className="panel vault-content-panel">
@@ -205,8 +264,8 @@ function Dashboard({ vault, onVaultUpdated }) {
             placeholder="Reason for emergency unlock request"
           />
         </label>
-        <button type="button" className="btn" onClick={handleRequestUnlock} disabled={loading}>
-          Trigger Nominee Notification
+        <button type="button" className="btn" onClick={handleRequestUnlock} disabled={loading || notificationStarted}>
+          {notificationStarted ? 'Nominees Already Notified' : 'Trigger Nominee Notification'}
         </button>
       </article>
 

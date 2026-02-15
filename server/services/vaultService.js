@@ -1,8 +1,10 @@
 const { randomUUID } = require('crypto');
+const jwt = require('jsonwebtoken');
 
 const { query } = require('../db/postgres');
+const { getJwtSecret } = require('./authService');
 const { encryptText, decryptText, getServerEncryptionKey } = require('../utils/crypto');
-const { notifyNominee } = require('../utils/notifications');
+const { notifyNominee, sendNomineeVerificationCode } = require('../utils/notifications');
 const {
   isS3Enabled,
   getBucketNameForUser,
@@ -113,12 +115,13 @@ async function persistVault(vault) {
 async function notifyNomineesForVault(vault, nowIso) {
   const key = getServerEncryptionKey();
 
-  vault.nominees = (vault.nominees || []).map((nominee) => {
+  const updatedNominees = [];
+  for (const nominee of vault.nominees || []) {
     const shareRecord = (vault.shares?.fragments || []).find((item) => item.shareId === nominee.id);
     const nomineeShare = shareRecord ? decryptText(shareRecord.encryptedShare, key) : '';
 
     if (!nominee.notifiedAt) {
-      notifyNominee({
+      await notifyNominee({
         vaultId: vault.vaultId,
         vaultName: vault.vaultName,
         nomineeEmail: nominee.email,
@@ -127,12 +130,14 @@ async function notifyNomineesForVault(vault, nowIso) {
       });
     }
 
-    return {
+    updatedNominees.push({
       ...nominee,
       notifiedAt: nominee.notifiedAt || nowIso,
       status: nominee.status === 'approved' ? nominee.status : 'pending',
-    };
-  });
+    });
+  }
+
+  vault.nominees = updatedNominees;
 }
 
 function buildVaultMetadata({
@@ -286,6 +291,9 @@ async function getVaultDashboard(vaultId) {
 async function checkInByOwner(ownerId) {
   const vault = await requireVaultByOwner(ownerId);
   const now = new Date().toISOString();
+  if (vault.status === STATUS.NOMINEES_NOTIFIED || vault.status === STATUS.UNLOCKED) {
+    throw new Error('Check-in is disabled after nominee notification has started');
+  }
 
   vault.lastCheckIn = now;
   vault.checkIns = [...(vault.checkIns || []), now];
@@ -361,7 +369,7 @@ async function storeEncryptedSharesForOwner(ownerId, { shares, threshold, totalS
   }
 
   if (Number(threshold) !== 3 || Number(totalShares) !== 3) {
-    throw new Error('DEADLOCK requires 3-of-3 secret sharing');
+    throw new Error('DEAD SERIOUS requires 3-of-3 secret sharing');
   }
 
   const key = getServerEncryptionKey();
@@ -618,6 +626,125 @@ async function getNomineeCheckpoint(vaultId) {
   };
 }
 
+function generateOtpCode() {
+  return String(Math.floor(100000 + Math.random() * 900000));
+}
+
+function buildNomineeStatus(vault) {
+  const checkpoint = vault.shareCheckpoint || {
+    submittedByNominee: {},
+    submittedCount: 0,
+    completedAt: null,
+  };
+
+  return {
+    vaultId: vault.vaultId,
+    vaultName: vault.vaultName,
+    status: vault.status,
+    submittedCount: Object.keys(checkpoint.submittedByNominee || {}).length,
+    required: 3,
+    canAccess:
+      Object.keys(checkpoint.submittedByNominee || {}).length === 3 && vault.status === STATUS.UNLOCKED,
+    nominees: (vault.nominees || []).map((nominee) => ({
+      id: nominee.id,
+      email: nominee.email,
+      submitted: Boolean(nominee.shareSubmittedAt),
+      submittedAt: nominee.shareSubmittedAt || null,
+    })),
+  };
+}
+
+async function getNomineeStatus(vaultId) {
+  const vault = await requireVaultById(vaultId);
+  return buildNomineeStatus(vault);
+}
+
+async function startNomineeLogin(vaultId, nomineeEmail) {
+  const vault = await requireVaultById(vaultId);
+  const normalizedNominee = String(nomineeEmail || '').trim().toLowerCase();
+
+  if (vault.status !== STATUS.NOMINEES_NOTIFIED && vault.status !== STATUS.UNLOCKED) {
+    throw new Error('Nominee login unavailable before notification');
+  }
+
+  const nominee = (vault.nominees || []).find((item) => item.email === normalizedNominee);
+  if (!nominee) {
+    throw new Error('Nominee not found');
+  }
+
+  const code = generateOtpCode();
+  const challengeToken = jwt.sign(
+    {
+      type: 'nominee_challenge',
+      vaultId: vault.vaultId,
+      nomineeEmail: normalizedNominee,
+      code,
+    },
+    getJwtSecret(),
+    { expiresIn: '10m' }
+  );
+
+  await sendNomineeVerificationCode({
+    vaultId: vault.vaultId,
+    nomineeEmail: normalizedNominee,
+    code,
+  });
+
+  return {
+    challengeToken,
+    expiresIn: '10m',
+    ...(process.env.NODE_ENV === 'production' ? {} : { devCode: code }),
+  };
+}
+
+async function verifyNomineeLogin(challengeToken, code) {
+  if (!challengeToken || !code) {
+    throw new Error('challengeToken and code are required');
+  }
+
+  let payload;
+  try {
+    payload = jwt.verify(challengeToken, getJwtSecret());
+  } catch {
+    throw new Error('Invalid or expired challenge token');
+  }
+
+  if (payload.type !== 'nominee_challenge') {
+    throw new Error('Invalid challenge token type');
+  }
+
+  if (String(payload.code) !== String(code).trim()) {
+    throw new Error('Invalid verification code');
+  }
+
+  const vault = await requireVaultById(payload.vaultId);
+  if (vault.status !== STATUS.NOMINEES_NOTIFIED && vault.status !== STATUS.UNLOCKED) {
+    throw new Error('Nominee login unavailable before notification');
+  }
+  const nominee = (vault.nominees || []).find((item) => item.email === payload.nomineeEmail);
+  if (!nominee) {
+    throw new Error('Nominee not found');
+  }
+
+  const token = jwt.sign(
+    {
+      type: 'nominee_access',
+      vaultId: payload.vaultId,
+      nomineeEmail: payload.nomineeEmail,
+    },
+    getJwtSecret(),
+    { expiresIn: '2h' }
+  );
+
+  return {
+    token,
+    nominee: payload.nomineeEmail,
+    vaultId: payload.vaultId,
+    vaultName: vault.vaultName,
+    expiresIn: '2h',
+  };
+}
+
 async function listFilesForNominee(vaultId, nomineeEmail, share) {
   const vault = await requireVaultById(vaultId);
   requireNomineeAccess(vault, nomineeEmail, share, { requireUnlocked: true });
@@ -726,8 +853,11 @@ module.exports = {
   deleteFileForOwner,
   listFilesForOwner,
   downloadFileForOwner,
+  startNomineeLogin,
+  verifyNomineeLogin,
   submitNomineeShare,
   getNomineeCheckpoint,
+  getNomineeStatus,
   listFilesForNominee,
   downloadFileForNominee,
   evaluateDeadManSwitches,

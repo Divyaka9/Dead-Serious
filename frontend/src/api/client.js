@@ -42,9 +42,9 @@ function buildCandidatePaths(path) {
   return [normalized, prefixed]
 }
 
-async function request(path, options = {}) {
+async function request(path, options = {}, authTokenOverride = null) {
   const candidatePaths = buildCandidatePaths(path)
-  const token = getToken()
+  const token = authTokenOverride ?? getToken()
 
   let lastError = null
 
@@ -111,6 +111,10 @@ async function requestWithFallback(primaryPath, fallbackPath, options = {}) {
   }
 }
 
+async function requestWithToken(path, token, options = {}) {
+  return request(path, options, token)
+}
+
 export const apiClient = {
   getSession: () => getStoredSession(),
   clearSession: () => persistSession(null),
@@ -130,6 +134,10 @@ export const apiClient = {
   },
 
   getMe: () => request('/auth/me'),
+  nomineeStartLogin: (body) =>
+    request('/auth/nominee/start', { method: 'POST', body: JSON.stringify(body) }),
+  nomineeVerifyLogin: (body) =>
+    request('/auth/nominee/verify', { method: 'POST', body: JSON.stringify(body) }),
 
   getMyVault: () => request('/vault/me'),
   upsertMyVault: (body) =>
@@ -170,6 +178,17 @@ export const apiClient = {
   },
   submitNomineeShare: (vaultId, body) =>
     request(`/vault/${vaultId}/submit-share`, { method: 'POST', body: JSON.stringify(body) }),
+  nomineeGetStatus: (token) => requestWithToken('/vault/nominee/status', token),
+  nomineeSubmitShare: (token, body) =>
+    requestWithToken('/vault/nominee/submit-share', token, { method: 'POST', body: JSON.stringify(body) }),
+  nomineeListFiles: (token, body) => {
+    const share = encodeURIComponent(body?.share || '')
+    return requestWithToken(`/vault/nominee/files?share=${share}`, token)
+  },
+  nomineeDownloadUrl: (token, fileId, body) => {
+    const share = encodeURIComponent(body?.share || '')
+    return `${API_BASE_URL}/vault/nominee/files/${fileId}/download?share=${share}&token=${encodeURIComponent(token || '')}`
+  },
 
   evaluateDeadman: () => request('/vault/evaluate-deadman', { method: 'POST' }),
 }
