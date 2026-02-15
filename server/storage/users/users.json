@@ -22,5 +22,13 @@
     "passwordHash": "$2b$10$shdr3Zn7ziGj0cgC2dnOAuVCUJ3yZsVKXmgGDF0OvesE655D9VikC",
     "createdAt": "2026-02-14T21:11:37.598Z",
     "updatedAt": "2026-02-14T21:11:37.598Z"
+  },
+  {
+    "userId": "f6a66117-3cd5-4ebc-aeb8-7300bd0f9442",
+    "email": "akresharwari@gmail.com",
+    "name": "Sharwari",
+    "passwordHash": "$2b$10$wln5yxkwVqmsiMdOUg7zdePjIOVDdzjeUF6VuMpNusGNTtmZo52Ym",
+    "createdAt": "2026-02-15T04:05:58.286Z",
+    "updatedAt": "2026-02-15T04:05:58.286Z"
   }
 ]

@@ -1,6 +1,7 @@
 {
   "scripts": {
-    "seed:users": "node server/scripts/seedUsers.js"
+    "seed:users": "node server/scripts/seedUsers.js",
+    "migrate:users": "node server/scripts/migrateUsersToPostgres.js"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.888.0",

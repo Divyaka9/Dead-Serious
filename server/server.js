@@ -1,5 +1,6 @@
 const path = require("path");
-require("dotenv").config({ path: path.join(__dirname, "..", ".env"), override: true });
+require("dotenv").config({ path: path.join(__dirname, ".env"), override: true });
+require("dotenv").config({ path: path.join(__dirname, "..", ".env"), override: false });
 
 const express = require("express");
 const cors = require("cors");
@@ -24,7 +25,7 @@ const PORT = Number(process.env.PORT || 3000);
 const MONITOR_INTERVAL_MS = Number(process.env.DEADMAN_MONITOR_INTERVAL_MS || 60_000);
 
 async function startServer() {
-  if (process.env.USE_POSTGRES === "true") {
+  if (process.env.USE_POSTGRES === "true" || Boolean(String(process.env.DATABASE_URL || "").trim())) {
     const { initPostgres } = require("./db/postgres");
     await initPostgres();
   }

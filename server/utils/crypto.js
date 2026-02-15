@@ -34,9 +34,12 @@ function getServerEncryptionKey() {
     throw new Error("MASTER_SHARE_ENCRYPTION_KEY is required for share encryption");
   }
 
-  const key = Buffer.from(rawKey, "base64");
+  const normalizedKey = String(rawKey).trim();
+  const isHexKey = /^[0-9a-fA-F]{64}$/.test(normalizedKey);
+  const key = isHexKey ? Buffer.from(normalizedKey, "hex") : Buffer.from(normalizedKey, "base64");
+
   if (key.length !== SERVER_KEY_BYTES) {
-    throw new Error("MASTER_SHARE_ENCRYPTION_KEY must decode to 32 bytes (base64)");
+    throw new Error("MASTER_SHARE_ENCRYPTION_KEY must be 32 bytes (base64 or 64-char hex)");
   }
 
   return key;

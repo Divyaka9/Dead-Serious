@@ -93,6 +93,20 @@ async function requestWithFallback(primaryPath, fallbackPath, options = {}) {
     if (!fallbackPath) {
       throw primaryError
     }
+
+    const message = String(primaryError?.message || '')
+    const shouldFallback =
+      message.includes('unsupported API call') ||
+      message.includes('Cannot POST') ||
+      message.includes('Cannot GET') ||
+      message.includes('Cannot PUT') ||
+      message.includes('Cannot DELETE') ||
+      message.includes('Request failed: 404')
+
+    if (!shouldFallback) {
+      throw primaryError
+    }
+
     return request(fallbackPath, options)
   }
 }

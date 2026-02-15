@@ -4,7 +4,8 @@ const { randomUUID } = require('crypto')
 const bcrypt = require('bcrypt')
 const jwt = require('jsonwebtoken')
 
-const USE_POSTGRES = process.env.USE_POSTGRES === 'true'
+const USE_POSTGRES =
+  process.env.USE_POSTGRES === 'true' || Boolean(String(process.env.DATABASE_URL || '').trim())
 const USERS_DIR = path.join(__dirname, '..', 'storage', 'users')
 const USERS_FILE = path.join(USERS_DIR, 'users.json')
 const TOKEN_TTL = process.env.JWT_EXPIRES_IN || '7d'

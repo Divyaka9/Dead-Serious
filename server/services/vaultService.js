@@ -145,6 +145,7 @@ function buildVaultMetadata({
   checkInIntervalDays,
   gracePeriodDays,
   maxMissedCheckIns,
+  storageProvider,
   bucketName,
   now,
 }) {
@@ -180,7 +181,7 @@ function buildVaultMetadata({
       updatedAt: null,
     },
     storage: {
-      provider: 's3',
+      provider: storageProvider,
       bucketName,
       rootPrefix: `vaults/${vaultId}`,
     },
@@ -197,14 +198,15 @@ async function upsertVaultForOwner({
   gracePeriodDays,
   maxMissedCheckIns,
 }) {
-  if (!isS3Enabled()) {
-    throw new Error('S3 must be enabled for vault file storage');
-  }
-
   const row = await getVaultRowByOwner(ownerId);
   const now = new Date().toISOString();
-  const bucketName = getBucketNameForUser(ownerId);
-  await ensureBucketExists(bucketName);
+  const s3Enabled = isS3Enabled();
+  const storageProvider = s3Enabled ? 's3' : 'local';
+  const bucketName = s3Enabled ? getBucketNameForUser(ownerId) : null;
+
+  if (s3Enabled) {
+    await ensureBucketExists(bucketName);
+  }
 
   if (!row) {
     const vaultId = randomUUID();
@@ -218,6 +220,7 @@ async function upsertVaultForOwner({
       checkInIntervalDays,
       gracePeriodDays,
       maxMissedCheckIns,
+      storageProvider,
       bucketName,
       now,
     });
@@ -247,7 +250,7 @@ async function upsertVaultForOwner({
     },
     storage: {
       ...existing.storage,
-      provider: 's3',
+      provider: storageProvider,
       bucketName,
       rootPrefix: existing.storage?.rootPrefix || `vaults/${existing.vaultId}`,
     },
