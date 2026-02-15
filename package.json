@@ -1,7 +1,8 @@
 {
   "scripts": {
     "seed:users": "node server/scripts/seedUsers.js",
-    "migrate:users": "node server/scripts/migrateUsersToPostgres.js"
+    "migrate:users": "node server/scripts/migrateUsersToPostgres.js",
+    "test:email": "node server/scripts/testEmail.js"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.967.0",
@@ -12,7 +13,7 @@
     "express": "^5.2.1",
     "jsonwebtoken": "^9.0.3",
     "multer": "^2.0.2",
-    "nodemailer": "^8.0.1",
+    "nodemailer": "^7.0.13",
     "pg": "^8.16.3",
     "uuid": "^13.0.0",
     "valkey": "^0.0.3"

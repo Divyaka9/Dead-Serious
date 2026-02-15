@@ -333,7 +333,7 @@ async function requestUnlockByOwner(ownerId, reason = '') {
     ...nominee,
     status: 'pending',
     approvedAt: null,
-    notifiedAt: nominee.notifiedAt || now,
+    notifiedAt: nominee.notifiedAt || null,
   }));
   vault.deadMan.nomineesNotifiedAt = vault.deadMan.nomineesNotifiedAt || now;
   vault.updatedAt = now;
@@ -684,15 +684,31 @@ async function startNomineeLogin(vaultId, nomineeEmail) {
     { expiresIn: '10m' }
   );
 
-  await sendNomineeVerificationCode({
-    vaultId: vault.vaultId,
-    nomineeEmail: normalizedNominee,
-    code,
-  });
+  let otpDelivery = 'sent';
+  let otpDeliveryError = null;
+
+  try {
+    await sendNomineeVerificationCode({
+      vaultId: vault.vaultId,
+      nomineeEmail: normalizedNominee,
+      code,
+    });
+  } catch (error) {
+    otpDelivery = 'failed';
+    otpDeliveryError = error?.message || 'Unknown mail transport error';
+
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error(`Failed to send nominee verification email: ${otpDeliveryError}`);
+    }
+
+    console.error(`[nominee-otp] delivery failed nominee=${normalizedNominee} vault=${vault.vaultId}: ${otpDeliveryError}`);
+  }
 
   return {
     challengeToken,
     expiresIn: '10m',
+    otpDelivery,
+    ...(otpDeliveryError ? { otpDeliveryError } : {}),
     ...(process.env.NODE_ENV === 'production' ? {} : { devCode: code }),
   };
 }

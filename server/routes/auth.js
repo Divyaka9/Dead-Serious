@@ -64,13 +64,19 @@ router.post("/nominee/start", async (req, res) => {
     if (
       error.message.includes("Nominee") ||
       error.message.includes("Vault not found") ||
-      error.message.includes("unavailable")
+      error.message.includes("unavailable") ||
+      error.message.includes("verification email")
     ) {
       return res.status(400).json({ error: error.message });
     }
 
     console.error(error);
-    return res.status(500).json({ error: "Failed to start nominee login" });
+    return res.status(500).json({
+      error:
+        process.env.NODE_ENV === "production"
+          ? "Failed to start nominee login"
+          : error.message || "Failed to start nominee login",
+    });
   }
 });
 

@@ -1,4 +1,5 @@
 let cachedTransporter = null;
+let transporterVerified = false;
 let loggedMissingConfig = false;
 let loggedMissingPackage = false;
 
@@ -41,12 +42,23 @@ function getTransporter() {
 
 async function sendMail({ to, subject, text }) {
   const transporter = getTransporter();
+  const allowFallback = process.env.MAIL_FALLBACK_TO_LOG === 'true';
   if (!transporter) {
-    console.log(`[mail-fallback] to=${to} subject="${subject}" body="${text}"`);
-    return;
+    const reason = 'SMTP not configured. Set SMTP_* or EMAIL_* env vars.'
+    if (allowFallback) {
+      console.log(`[mail-fallback] to=${to} subject="${subject}" body="${text}"`);
+      return;
+    }
+    throw new Error(reason);
   }
 
   try {
+    if (!transporterVerified) {
+      await transporter.verify();
+      transporterVerified = true;
+      console.log('[mail] transporter verified');
+    }
+
     const info = await transporter.sendMail({
       from: process.env.SMTP_FROM || process.env.SMTP_USER || process.env.EMAIL_USER,
       to,
@@ -82,6 +94,7 @@ async function sendNomineeVerificationCode({ vaultId, nomineeEmail, code }) {
 }
 
 module.exports = {
+  sendMail,
   notifyNominee,
   sendNomineeVerificationCode,
 };

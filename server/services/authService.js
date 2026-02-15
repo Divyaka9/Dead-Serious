@@ -160,6 +160,7 @@ function verifyToken(token) {
 }
 
 module.exports = {
+  getJwtSecret,
   registerUser,
   loginUser,
   verifyToken,
