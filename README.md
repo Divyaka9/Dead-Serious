@@ -215,3 +215,11 @@ Dead Serious directly addresses the cybersecurity & privacy track through:
 ## 📜 License
 
 Hackathon project — NC State HackNC 2026
+
+---
+
+## Devpost Link
+
+Check out our project here: [Devpost](https://devpost.com/software/deadserious)
+
+
